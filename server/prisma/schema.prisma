@@ -1,0 +1,178 @@
+// Schema de la base man.artt galeries.
+// SQLite en developpement ; passer `provider` a "postgresql" pour la production
+// ne demande aucun changement de modele.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+/// La photographe. Un seul compte en pratique, mais le modele reste ouvert.
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime      @default(now())
+  galleries    Gallery[]
+  participants Participant[]
+}
+
+/// Participant a un tirage au sort (concours Instagram).
+/// `entries` = nombre de participations, qui pondere les chances au tirage.
+model Participant {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  handle    String
+  entries   Int      @default(1)
+  createdAt DateTime @default(now())
+
+  @@unique([ownerId, handle])
+  @@index([ownerId])
+}
+
+model Gallery {
+  id              String     @id @default(cuid())
+  /// Code saisi par le client. Unique, insensible a la casse cote applicatif.
+  code            String     @unique
+  title           String
+  clientName      String     @default("")
+  shotAt          DateTime
+  /// null = pas d'expiration
+  expiresAt       DateTime?
+  downloadEnabled Boolean    @default(true)
+  /// Une galerie non publiee refuse le code, meme s'il est correct.
+  published       Boolean    @default(false)
+
+  /// Galerie limitee : le client choisit un nombre fixe de photos, puis
+  /// valide sa selection avant de pouvoir la telecharger. Les photos
+  /// consultees portent alors un filigrane.
+  limitedSelection Boolean   @default(false)
+  /// Nombre de photos comprises, quand la galerie est limitee.
+  selectionLimit   Int       @default(10)
+
+  /// Demander au client l'autorisation de diffuser ses photos.
+  /// A decocher pour les seances ou la question n'a pas lieu d'etre.
+  imageConsentRequested Boolean @default(true)
+
+  /// Suivi de la livraison, pour que la photographe sache ou en est sa cliente.
+  /// Renseigne par les visites du client uniquement : l'apercu de la
+  /// photographe passe par une autre route et ne compte pas.
+  /// null = ce n'est jamais arrive.
+  firstOpenedAt    DateTime?
+  lastOpenedAt     DateTime?
+  lastDownloadedAt DateTime?
+
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  ownerId         String
+  owner           User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  photos          Photo[]
+  favorites       Favorite[]
+  /// Au plus une : la selection appartient a la galerie.
+  selection       Selection?
+  imageConsents   ImageConsent[]
+
+  @@index([ownerId])
+}
+
+/// Reponse du client a la demande d'autorisation de diffusion.
+///
+/// Journal, et non enregistrement unique : la reponse courante est la plus
+/// recente, mais les precedentes sont conservees. C'est ce qui permet de
+/// montrer qu'un accord existait au moment d'une publication, meme s'il a ete
+/// retire depuis — un consentement est revocable, pas retroactif.
+model ImageConsent {
+  id           String   @id @default(cuid())
+  galleryId    String
+  gallery      Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+
+  /// true = autorise la diffusion, false = refuse ou retire son accord
+  granted      Boolean
+  /// Nom saisi par la personne qui repond : l'equivalent d'une signature.
+  signerName   String
+  /// Restrictions exprimees en clair, si la personne en a formule.
+  notes        String   @default("")
+
+  /// Texte exact auquel la personne a consenti, fige au moment de la reponse.
+  /// Le conserver ici, et pas seulement son numero de version, est ce qui
+  /// donne sa valeur a la trace : le texte affiche aujourd'hui peut changer.
+  termsVersion String
+  termsText    String
+
+  visitorId    String
+  createdAt    DateTime @default(now())
+
+  @@index([galleryId, createdAt])
+}
+
+/// Selection validee sur une galerie limitee.
+/// Sa presence fige les favoris : c'est ce qui empeche de telecharger un lot,
+/// de changer d'avis, et de repartir avec toute la galerie.
+///
+/// Une seule par galerie. Le forfait appartient a la galerie, pas a l'appareil
+/// qui l'a ouverte : sans cette contrainte, ouvrir le meme lien sur un second
+/// telephone rouvrait un forfait entier.
+model Selection {
+  id          String   @id @default(cuid())
+  galleryId   String   @unique
+  gallery     Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  /// Appareil qui a valide. Indicatif : ne donne aucun droit particulier.
+  visitorId   String
+  validatedAt DateTime @default(now())
+}
+
+model Photo {
+  id           String     @id @default(cuid())
+  galleryId    String
+  gallery      Gallery    @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+
+  /// Nom du fichier tel que fourni, affiche a la photographe
+  originalName String
+  /// Cles de stockage (chemins relatifs dans le dossier d'upload)
+  storageKey   String
+  thumbKey     String
+  /// Image affichable, quand `storageKey` ne l'est pas : un RAW d'appareil
+  /// photo (.ORF, .CR2...) n'est lisible par aucun navigateur. On y range
+  /// l'apercu JPEG que le boitier a lui-meme embarque dans le fichier.
+  /// null = l'original est directement affichable.
+  previewKey   String?
+  mimeType     String
+  width        Int
+  height       Int
+  bytes        Int
+  /// Ordre d'affichage dans la galerie
+  position     Int        @default(0)
+  createdAt    DateTime   @default(now())
+
+  favorites    Favorite[]
+
+  @@index([galleryId, position])
+}
+
+/// Photo retenue par le client.
+///
+/// La selection appartient a la galerie, pas au visiteur : un couple qui
+/// choisit a deux, sur deux ecrans, voit et modifie la meme liste. C'est aussi
+/// ce qui fait qu'un forfait de dix photos reste un forfait de dix photos,
+/// quel que soit le nombre d'appareils qui ouvrent le lien.
+model Favorite {
+  id        String   @id @default(cuid())
+  galleryId String
+  gallery   Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  /// Unique : une photo est dans la selection, ou elle n'y est pas.
+  photoId   String   @unique
+  photo     Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  /// Appareil qui l'a ajoutee. Indicatif : ne donne aucun droit particulier.
+  visitorId String
+  createdAt DateTime @default(now())
+
+  @@index([galleryId])
+}

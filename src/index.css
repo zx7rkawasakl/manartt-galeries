@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------
+   Inter Tight (licence SIL OFL), auto-hebergee via Fontsource.
+   Remplace l'Helvetica du modele initial : celle-ci etait servie par un
+   CDN gratuit qui la redistribuait sans licence Monotype claire, et
+   ajoutait une dependance a un tiers pouvant tomber.
+   Fichier variable : une seule requete couvre toutes les graisses.
+   ------------------------------------------------------------------ */
+@import "@fontsource-variable/inter-tight/index.css";
+
+@theme {
+  --font-sans: "Inter Tight Variable", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* Galerie : fond clair et neutre, l'interface s'efface derriere les photos */
+  --color-paper: #faf9f7;
+  --color-paper-soft: #f2f0ec;
+  --color-ink: #1c1a17;
+  --color-ink-soft: #6b6660;
+  --color-ink-faint: #9d968d;
+
+  /* Caramel man.artt, releve sur manartt.fr. Reserve aux moments qui doivent
+     ressortir (revelation d'un gagnant) ; le reste de l'admin reste monochrome.
+     `deep` sert des qu'un texte clair se pose dessus, pour tenir le contraste AA. */
+  --color-accent: #cd8e64;
+  --color-accent-deep: #a9673d;
+  --color-accent-wash: #f5e9dd;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Fond sombre par defaut (landing immersive). La galerie bascule en clair
+     via [data-surface="light"] pour eviter un overscroll sombre sur iOS. */
+  body {
+    @apply bg-neutral-950 text-white antialiased;
+  }
+
+  html[data-surface="light"] body {
+    @apply bg-paper text-ink;
+  }
+
+  /* Anneau de focus visible partout, y compris sur fond photo */
+  :focus-visible {
+    @apply outline-none ring-2 ring-white/80 ring-offset-2 ring-offset-black/40;
+  }
+
+  html[data-surface="light"] :focus-visible {
+    @apply ring-ink/70 ring-offset-paper;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Liquid glass (approximation web du materiau translucide, pas une
+   implementation Apple officielle).
+   ------------------------------------------------------------------ */
+.liquid-glass {
+  background: rgba(255, 255, 255, 0.01);
+  background-blend-mode: luminosity;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: none;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.liquid-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.4px;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.15) 20%,
+    rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%,
+    rgba(255,255,255,0.15) 80%, rgba(255,255,255,0.45) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Repli lisible si l'utilisateur reduit la transparence */
+@media (prefers-reduced-transparency: reduce) {
+  .liquid-glass {
+    background: rgba(10, 10, 10, 0.72);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}

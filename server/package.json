@@ -1,0 +1,41 @@
+{
+  "name": "manartt-galeries-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "API de livraison de galeries photo man.artt",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "build": "tsc --noEmit",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "generate": "prisma generate",
+    "account": "tsx src/set-account.ts"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.2",
+    "@fastify/cors": "^11.3.0",
+    "@fastify/multipart": "^10.1.1",
+    "@fastify/rate-limit": "^11.2.0",
+    "@prisma/adapter-better-sqlite3": "^7.9.1",
+    "@prisma/client": "^7.9.1",
+    "archiver": "^8.0.0",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.2.4",
+    "fastify": "^5.12.1",
+    "jose": "^6.2.9",
+    "sharp": "^0.35.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/archiver": "^8.0.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^26.2.0",
+    "pino-pretty": "^13.1.3",
+    "prisma": "^7.9.1",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}
