@@ -106,19 +106,49 @@ mémoire, une galerie de plusieurs gigaoctets passe sans faire enfler le serveur
 
 ## Passer en production
 
+La marche à suivre complète — VPS, nginx, systemd, certificat, sauvegarde —
+est dans le **mode d'emploi de déploiement**. Les fichiers de configuration
+prêts à poser vivent dans [`../deploy/`](../deploy/) :
+
+| Fichier | Rôle |
+|---|---|
+| `nginx-manartt.conf` | site nginx : réécriture SPA, limite d'envoi, proxy de l'API |
+| `manartt-api.service` | service systemd |
+| `sauvegarde.sh` | copie quotidienne de la base **et** des photos |
+
+Trois points à ne pas manquer :
+
 1. **Régénérer `AUTH_SECRET`** :
    `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`
-2. **Postgres** : passer `provider` à `postgresql` dans `prisma/schema.prisma`
-   et remplacer l'adaptateur par `@prisma/adapter-pg` dans `src/db.ts`.
-   Aucun modèle ni aucune route ne change.
-3. **Stockage objet** (S3, R2) : seul `src/storage.ts` est à réécrire, les
-   routes ne manipulent que des clés opaques.
-4. `NODE_ENV=production` active `secure` sur les cookies : servir en HTTPS.
+2. **HTTPS obligatoire.** `NODE_ENV=production` active `secure` sur les
+   cookies : en HTTP simple, le navigateur les jette et plus rien ne
+   fonctionne, ni connexion ni galerie.
+3. **Chemins absolus** pour `DATABASE_URL` et `UPLOAD_DIR`, et
+   `WorkingDirectory` dans le service systemd : ils sont résolus depuis le
+   dossier courant.
+
+En mode production, l'API n'écoute que sur `127.0.0.1` et croit l'en-tête
+`X-Forwarded-For` du proxy local (`trustProxy: 'loopback'`). nginx est donc la
+seule porte d'entrée — c'est ce qui empêche de s'inventer une adresse pour
+contourner le frein anti-force brute.
+
+### Migrations plus tard
+
+- **Postgres** : passer `provider` à `postgresql` dans `prisma/schema.prisma`
+  et remplacer l'adaptateur par `@prisma/adapter-pg` dans `src/db.ts`.
+  Aucun modèle ni aucune route ne change.
+- **Stockage objet** (S3, R2) : seul `src/storage.ts` est à réécrire, les
+  routes ne manipulent que des clés opaques.
 
 ## Limite connue
 
 `npm audit` signale `deepmerge-ts` via `@prisma/config`. C'est une dépendance
-**du CLI Prisma** (devDependency), pas du client utilisé à l'exécution :
-l'exploitation supposerait un fichier de configuration malveillant, que nous
-fournissons nous-mêmes. Le correctif imposerait de rétrograder Prisma en v6,
-incompatible avec `@prisma/client@7`.
+**du CLI Prisma**, jamais importée par l'API à l'exécution : elle ne sert qu'à
+lire `prisma.config.ts` pendant `prisma generate`. L'exploitation supposerait
+un fichier de configuration malveillant, que nous fournissons nous-mêmes. Le
+correctif imposerait de rétrograder Prisma en v6, incompatible avec
+`@prisma/client@7`.
+
+Le CLI figure dans `dependencies` et non `devDependencies` : un déploiement qui
+installe sans les dépendances de développement doit tout de même pouvoir lancer
+`prisma generate`, le client généré n'étant pas versionné.

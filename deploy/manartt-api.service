@@ -1,0 +1,55 @@
+# ===================================================================
+#  systemd — API des galeries man.artt
+# -------------------------------------------------------------------
+#     sudo cp deploy/manartt-api.service /etc/systemd/system/
+#     sudo systemctl daemon-reload
+#     sudo systemctl enable --now manartt-api
+#     sudo systemctl status manartt-api
+#
+#  Journal :  sudo journalctl -u manartt-api -f
+# ===================================================================
+
+[Unit]
+Description=API des galeries man.artt
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=manartt
+Group=manartt
+
+# INDISPENSABLE. Les chemins de la configuration (UPLOAD_DIR,
+# DATABASE_URL) sont resolus depuis le dossier courant, et c'est aussi
+# ici que le serveur va chercher son fichier .env. Sans cette ligne, les
+# photos partiraient dans un dossier au hasard — et la base est le seul
+# index vers des fichiers nommes en UUID.
+WorkingDirectory=/var/www/manartt/server
+
+# Pose ici et non dans .env : la valeur de systemd l'emporte sur celle du
+# fichier, donc on ne peut pas demarrer en production par accident avec un
+# reglage de developpement oublie.
+Environment=NODE_ENV=production
+
+ExecStart=/usr/bin/npm run start
+
+# Redemarrage automatique. Le serveur ferme proprement ses connexions sur
+# SIGTERM : un telechargement en cours n'est pas coupe net.
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=manartt-api
+
+# Durcissement. `full` laisse /var accessible en ecriture (les photos y
+# vivent) mais met /usr, /boot et /etc en lecture seule.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
