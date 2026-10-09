@@ -235,6 +235,11 @@ export type DrawInput = {
    * dans le fichier livre.
    */
   active?: number | null
+  /**
+   * Echange en cours : la case d'origine s'estompe, la case visee
+   * s'encadre. Comme `active`, jamais present dans le fichier exporte.
+   */
+  glisse?: { depuis: number; vers: number | null } | null
 }
 
 export function render(canvas: HTMLCanvasElement, input: DrawInput): void {
@@ -262,9 +267,27 @@ export function render(canvas: HTMLCanvasElement, input: DrawInput): void {
     ctx.drawImage(input.overlay, 0, 0, STORY_WIDTH, STORY_HEIGHT)
   }
 
+  // Echange en cours. L'origine est voilee plutot qu'effacee : on doit
+  // encore reconnaitre ce qu'on est en train de deplacer.
+  if (input.glisse) {
+    const cases = cells(input.layout)
+    const origine = cases[input.glisse.depuis]
+    if (origine) {
+      ctx.fillStyle = 'rgba(28,26,23,0.55)'
+      ctx.fillRect(origine.x, origine.y, origine.w, origine.h)
+    }
+    const vers = input.glisse.vers
+    const cible = vers != null && vers !== input.glisse.depuis ? cases[vers] : null
+    if (cible) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.95)'
+      ctx.lineWidth = 10
+      ctx.strokeRect(cible.x + 5, cible.y + 5, cible.w - 10, cible.h - 10)
+    }
+  }
+
   // Reperage de l'emplacement en cours d'ajustement. Dessine en dernier, et
   // jamais present lors de l'export : voir `exportBlob`.
-  if (input.active != null) {
+  if (input.active != null && !input.glisse) {
     const cell = cells(input.layout)[input.active]
     if (cell) {
       ctx.strokeStyle = 'rgba(255,255,255,0.95)'
@@ -329,7 +352,7 @@ export async function exportBlob(
   canvas: HTMLCanvasElement,
   input: DrawInput,
 ): Promise<Blob | null> {
-  render(canvas, { ...input, active: null })
+  render(canvas, { ...input, active: null, glisse: null })
   const blob = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, 'image/jpeg', 0.92),
   )
